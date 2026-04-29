@@ -73,13 +73,13 @@ function executeFling(targetName, speaker, isLoop)
             
             if not (hrp and hum and trgt_hrp) then return end
 
-            -- Smart Duration: 1 second if low ping or close
+            -- Smart Nanfling Duration Logic
             local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() or 999
             local distance = (hrp.Position - trgt_hrp.Position).Magnitude
             local flingDuration = 1.5
 
             if ping < 100 or distance <= 12 then
-                flingDuration = 1.0
+                flingDuration = 1.0        -- Changed back to 1 second
             end
 
             local originalCFrame = hrp.CFrame
@@ -102,14 +102,7 @@ function executeFling(targetName, speaker, isLoop)
                     return
                 end
 
-                -- Force stand up if sat down or tripped
-                if hum then
-                    hum.Jump = true
-                    if hum.PlatformStand or hum.Sit then
-                        hum.PlatformStand = false
-                        hum.Sit = false
-                    end
-                end
+                if hum then hum.Jump = true end
 
                 -- Nanfling Phase
                 if elapsed < flingDuration and char.Parent and trgt_chr.Parent then
