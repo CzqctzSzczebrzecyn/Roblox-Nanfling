@@ -5,11 +5,11 @@ local activeLoops = {}
 
 local Plugin = {
     ["PluginName"] = "NaN Fling",
-    ["PluginDescription"] = "NaN Fling with loop support",
+    ["PluginDescription"] = "NaN Fling with loop support + smart duration",
     ["Commands"] = {
         ["nanfling"] = {
             ["ListName"] = "nanfling [plr]",
-            ["Description"] = "Smart nanfling - stops when target humanoid is gone",
+            ["Description"] = "Smart nanfling (0.8s if low ping or close range)",
             ["Aliases"] = {"nfling", "nanf", "nf"},
             ["Function"] = function(args, speaker)
                 if not args[1] then return notify('Player Required', 'No player provided') end
@@ -33,7 +33,21 @@ local Plugin = {
             ["Aliases"] = {"unlnf", "unloopnanf", "unloopnf", "unloopnfling"},
             ["Function"] = function(args, speaker)
                 if not args[1] then return notify('Player Required', 'No player provided') end
-                stopLoop(args[1], speaker)
+                
+                local found = false
+                for _, v in next, getPlayer(args[1], speaker) do
+                    local trgt = Players:FindFirstChild(v)
+                    if trgt and activeLoops[trgt] then
+                        activeLoops[trgt]:Disconnect()
+                        activeLoops[trgt] = nil
+                        notify("Loop Stopped", "Stopped loop nanfling on " .. trgt.Name)
+                        found = true
+                    end
+                end
+                
+                if not found then
+                    notify("Not Found", "No active loop found for that player")
+                end
             end
         }
     }
@@ -45,7 +59,7 @@ function executeFling(targetName, speaker, isLoop)
     for _, v in next, getPlayer(targetName, speaker) do
         local trgt = Players:FindFirstChild(v)
         if not trgt or trgt == speaker then continue end
-
+        
         notify("Fling Started", isLoop and ("Loop nanfling enabled on " .. trgt.Name) or ("Nanflinging " .. trgt.Name))
 
         local loopConnection = nil
@@ -53,16 +67,23 @@ function executeFling(targetName, speaker, isLoop)
         local function doFling()
             local char = speaker.Character
             local trgt_chr = trgt.Character
+            
             if not char or not trgt_chr then return end
             
             local hrp = char:FindFirstChild("HumanoidRootPart")
             local hum = char:FindFirstChildOfClass("Humanoid")
             local trgt_hrp = trgt_chr:FindFirstChild("HumanoidRootPart")
+            
             if not (hrp and hum and trgt_hrp) then return end
 
+            -- Smart Nanfling Duration Logic
             local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() or 999
             local distance = (hrp.Position - trgt_hrp.Position).Magnitude
-            local flingDuration = (ping < 100 or distance <= 10) and 0.8 or 1.5
+            local flingDuration = 1.5
+
+            if ping < 100 or distance <= 12 then
+                flingDuration = 0.8
+            end
 
             local originalCFrame = hrp.CFrame
             local totalStartTime = tick()
@@ -72,25 +93,6 @@ function executeFling(targetName, speaker, isLoop)
 
             local mainConnection
             mainConnection = Runservice.Heartbeat:Connect(function()
-                -- Stop immediately if target's Humanoid is no longer detected
-                if not trgt_chr:FindFirstChildOfClass("Humanoid") or not trgt_hrp.Parent then
-                    mainConnection:Disconnect()
-                    if returnConnection then returnConnection:Disconnect() end
-                    
-                    -- Instant return + clear velocity
-                    if hrp and hrp.Parent then
-                        hrp.CFrame = originalCFrame
-                        hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                        hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-                    end
-                    
-                    if hum then 
-                        hum.PlatformStand = false 
-                        hum.Jump = false
-                    end
-                    return
-                end
-
                 local elapsed = tick() - totalStartTime
 
                 if elapsed >= 3 then
@@ -105,8 +107,8 @@ function executeFling(targetName, speaker, isLoop)
 
                 if hum then hum.Jump = true end
 
-                if elapsed < flingDuration then
-                    -- Nanfling Phase
+                -- Nanfling Phase
+                if elapsed < flingDuration and char.Parent and trgt_chr.Parent then
                     hrp.CFrame = trgt_hrp.CFrame
                     hrp.AssemblyLinearVelocity = nan_vector
                     hrp.AssemblyAngularVelocity = nan_vector
@@ -135,6 +137,7 @@ function executeFling(targetName, speaker, isLoop)
                         end)
                     end
 
+                    -- Move Forward
                     if hum then
                         local forwardDir = hrp.CFrame.LookVector
                         forwardDir = Vector3.new(forwardDir.X, 0, forwardDir.Z).Unit
@@ -154,22 +157,6 @@ function executeFling(targetName, speaker, isLoop)
             activeLoops[trgt] = loopConnection
             notify("Loop Active", "Loop nanfling is now running on " .. trgt.Name)
         end
-    end
-end
-
-function stopLoop(targetName, speaker)
-    local found = false
-    for _, v in next, getPlayer(targetName, speaker) do
-        local trgt = Players:FindFirstChild(v)
-        if trgt and activeLoops[trgt] then
-            activeLoops[trgt]:Disconnect()
-            activeLoops[trgt] = nil
-            notify("Loop Stopped", "Stopped loop nanfling on " .. trgt.Name)
-            found = true
-        end
-    end
-    if not found then
-        notify("Not Found", "No active loop found for that player")
     end
 end
 
