@@ -7,11 +7,11 @@ local touchCooldown = {}
 
 local Plugin = {
     ["PluginName"] = "NaN Fling",
-    ["PluginDescription"] = "Better NaN Fling coded by Czqctz Szczebrzecyn",
+    ["PluginDescription"] = "NaN Fling with loop and touch support",
     ["Commands"] = {
         ["nanfling"] = {
             ["ListName"] = "nanfling [plr]",
-            ["Description"] = "Flings a player straight into the void, creating the illusion of them being completely deleted",
+            ["Description"] = "Smart nanfling (0.8s if low ping or close range)",
             ["Aliases"] = {"nfling", "nanf", "nf"},
             ["Function"] = function(args, speaker)
                 if not args[1] then return notify('Player Required', 'No player provided') end
@@ -21,7 +21,7 @@ local Plugin = {
 
         ["loopnanfling"] = {
             ["ListName"] = "loopnanfling [plr]",
-            ["Description"] = "Repeatedly NaN Fling a player every time they respawn",
+            ["Description"] = "Repeatedly nanfling player every time they respawn",
             ["Aliases"] = {"loopnf", "lnf", "loopnanf", "loopnfling"},
             ["Function"] = function(args, speaker)
                 if not args[1] then return notify('Player Required', 'No player provided') end
@@ -31,7 +31,7 @@ local Plugin = {
 
         ["unloopnanfling"] = {
             ["ListName"] = "unloopnanfling [plr]",
-            ["Description"] = "Stop loop NaN Fling on a player",
+            ["Description"] = "Stop loop nanfling on a player",
             ["Aliases"] = {"unlnf", "unloopnanf", "unloopnf", "unloopnfling"},
             ["Function"] = function(args, speaker)
                 if not args[1] then return notify('Player Required', 'No player provided') end
@@ -41,7 +41,7 @@ local Plugin = {
 
         ["touchnanfling"] = {
             ["ListName"] = "touchnanfling",
-            ["Description"] = "Automatically NaN Fling anyone youre inside of (use antifling first)",
+            ["Description"] = "Automatically nanfling anyone within 1 stud (0.5s fling + 3s cooldown)",
             ["Aliases"] = {"touchnf", "tnf", "touchnanf", "touchnfling"},
             ["Function"] = function(args, speaker)
                 startTouchFling(speaker)
@@ -50,7 +50,7 @@ local Plugin = {
 
         ["untouchnanfling"] = {
             ["ListName"] = "untouchnanfling",
-            ["Description"] = "Stop automatic touch NaN Fling",
+            ["Description"] = "Stop automatic touch nanfling",
             ["Aliases"] = {"untouchnf", "untnf", "untouchnanf", "untouchnfling"},
             ["Function"] = function(args, speaker)
                 stopTouchFling(speaker)
@@ -65,21 +65,17 @@ function executeFling(targetName, speaker, isLoop, customDuration)
     for _, v in next, getPlayer(targetName, speaker) do
         local trgt = Players:FindFirstChild(v)
         if not trgt or trgt == speaker then continue end
-        
-        notify("Fling Started", isLoop and ("Loop nanfling enabled on " .. trgt.Name) or ("Nanflinging " .. trgt.Name))
 
         local loopConnection = nil
 
         local function doFling()
             local char = speaker.Character
             local trgt_chr = trgt.Character
-            
             if not char or not trgt_chr then return end
             
             local hrp = char:FindFirstChild("HumanoidRootPart")
             local hum = char:FindFirstChildOfClass("Humanoid")
             local trgt_hrp = trgt_chr:FindFirstChild("HumanoidRootPart")
-            
             if not (hrp and hum and trgt_hrp) then return end
 
             local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() or 999
@@ -190,6 +186,7 @@ function startTouchFling(speaker)
         local targetPlayer = Players:GetPlayerFromCharacter(targetChar)
         if not targetPlayer or targetPlayer == speaker then return end
 
+        -- 3 Second Cooldown
         local now = tick()
         if touchCooldown[speaker] and (now - touchCooldown[speaker]) < 3 then
             return
@@ -202,30 +199,27 @@ function startTouchFling(speaker)
             touchCooldown[speaker] = now
 
             task.spawn(function()
-                local targetSafeCFrame = targetHRP.CFrame
-                
-                local oldExecute = executeFling
-
                 local nan_vector = Vector3.new(0/0, 0/0, 0/0)
-                local char = speaker.Character
-                local trgt_chr = targetChar
+                local speakerChar = speaker.Character
+                if not speakerChar then return end
                 
-                if not (char and trgt_chr) then return end
+                local speakerHRP = speakerChar:FindFirstChild("HumanoidRootPart")
+                local hum = speakerChar:FindFirstChildOfClass("Humanoid")
+                local target_hrp = targetHRP
                 
-                local speakerHRP = char:FindFirstChild("HumanoidRootPart")
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                local trgt_hrp = trgt_chr:FindFirstChild("HumanoidRootPart")
-                
-                if not (speakerHRP and hum and trgt_hrp) then return end
+                if not (speakerHRP and hum and target_hrp) then return end
 
+                local targetSafeCFrame = target_hrp.CFrame   -- Save target's position
                 local totalStartTime = tick()
                 local returnConnection = nil
 
                 hum.PlatformStand = true
 
-                local mainConnection = Runservice.Heartbeat:Connect(function()
+                local mainConnection
+                mainConnection = Runservice.Heartbeat:Connect(function()
                     local elapsed = tick() - totalStartTime
 
+                    -- Stop after 3 seconds total
                     if elapsed >= 3 then
                         mainConnection:Disconnect()
                         if returnConnection then returnConnection:Disconnect() end
@@ -238,8 +232,9 @@ function startTouchFling(speaker)
 
                     if hum then hum.Jump = true end
 
+                    -- 0.5s Nanfling Phase
                     if elapsed < 0.5 then
-                        speakerHRP.CFrame = trgt_hrp.CFrame
+                        speakerHRP.CFrame = target_hrp.CFrame
                         speakerHRP.AssemblyLinearVelocity = nan_vector
                         speakerHRP.AssemblyAngularVelocity = nan_vector
                         
@@ -247,10 +242,11 @@ function startTouchFling(speaker)
                         
                         if sethiddenproperty then
                             pcall(function()
-                                sethiddenproperty(speakerHRP, "PhysicsRepRootPart", trgt_hrp)
+                                sethiddenproperty(speakerHRP, "PhysicsRepRootPart", target_hrp)
                             end)
                         end
                     else
+                        -- Return Phase - Return to target's last safe position
                         if not returnConnection then
                             returnConnection = Runservice.Heartbeat:Connect(function()
                                 if not speakerHRP or not speakerHRP.Parent then
@@ -278,7 +274,7 @@ function startTouchFling(speaker)
     end)
 
     touchConnections[speaker] = touchConn
-    notify("Touch Nanfling Enabled", "Auto 0.5s nanfling enabled with 3s cooldown • Returns to target's last position")
+    notify("Touch Nanfling Enabled", "Auto 0.5s nanfling + 3s cooldown enabled")
 end
 
 function stopTouchFling(speaker)
