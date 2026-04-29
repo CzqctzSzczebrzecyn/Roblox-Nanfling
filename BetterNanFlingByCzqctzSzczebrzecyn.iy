@@ -3,15 +3,15 @@ local Players = cloneref(game:GetService("Players"))
 
 local activeLoops = {}
 local touchConnections = {}
-local touchCooldown = {}  -- player -> last touch time
+local touchCooldown = {}
 
 local Plugin = {
     ["PluginName"] = "NaN Fling",
-    ["PluginDescription"] = "NaN Fling with loop and touch support",
+    ["PluginDescription"] = "Better NaN Fling coded by Czqctz Szczebrzecyn",
     ["Commands"] = {
         ["nanfling"] = {
             ["ListName"] = "nanfling [plr]",
-            ["Description"] = "Smart nanfling (0.8s if low ping or close range)",
+            ["Description"] = "Flings a player straight into the void, creating the illusion of them being completely deleted",
             ["Aliases"] = {"nfling", "nanf", "nf"},
             ["Function"] = function(args, speaker)
                 if not args[1] then return notify('Player Required', 'No player provided') end
@@ -21,7 +21,7 @@ local Plugin = {
 
         ["loopnanfling"] = {
             ["ListName"] = "loopnanfling [plr]",
-            ["Description"] = "Repeatedly nanfling player every time they respawn",
+            ["Description"] = "Repeatedly NaN Fling a player every time they respawn",
             ["Aliases"] = {"loopnf", "lnf", "loopnanf", "loopnfling"},
             ["Function"] = function(args, speaker)
                 if not args[1] then return notify('Player Required', 'No player provided') end
@@ -31,7 +31,7 @@ local Plugin = {
 
         ["unloopnanfling"] = {
             ["ListName"] = "unloopnanfling [plr]",
-            ["Description"] = "Stop loop nanfling on a player",
+            ["Description"] = "Stop loop NaN Fling on a player",
             ["Aliases"] = {"unlnf", "unloopnanf", "unloopnf", "unloopnfling"},
             ["Function"] = function(args, speaker)
                 if not args[1] then return notify('Player Required', 'No player provided') end
@@ -41,7 +41,7 @@ local Plugin = {
 
         ["touchnanfling"] = {
             ["ListName"] = "touchnanfling",
-            ["Description"] = "Automatically nanfling anyone within 1 stud (0.5s fling + 3s cooldown)",
+            ["Description"] = "Automatically NaN Fling anyone youre inside of (use antifling first)",
             ["Aliases"] = {"touchnf", "tnf", "touchnanf", "touchnfling"},
             ["Function"] = function(args, speaker)
                 startTouchFling(speaker)
@@ -50,7 +50,7 @@ local Plugin = {
 
         ["untouchnanfling"] = {
             ["ListName"] = "untouchnanfling",
-            ["Description"] = "Stop automatic touch nanfling",
+            ["Description"] = "Stop automatic touch NaN Fling",
             ["Aliases"] = {"untouchnf", "untnf", "untouchnanf", "untouchnfling"},
             ["Function"] = function(args, speaker)
                 stopTouchFling(speaker)
