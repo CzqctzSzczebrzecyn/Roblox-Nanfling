@@ -1,7 +1,7 @@
 local Runservice = cloneref(game:GetService("RunService"))
 local Players = cloneref(game:GetService("Players"))
 
-local activeLoops = {}
+local activeLoopTarget = nil  -- Now only tracks one loop at a time
 
 local Plugin = {
     ["PluginName"] = "NaN Fling",
@@ -19,34 +19,31 @@ local Plugin = {
 
         ["loopnanfling"] = {
             ["ListName"] = "loopnanfling [plr]",
-            ["Description"] = "Repeatedly nanfling a player every time they respawn",
+            ["Description"] = "Repeatedly nanfling a player every time they respawn (one player only)",
             ["Aliases"] = {"loopnf", "lnf", "loopnanf", "loopnfling"},
             ["Function"] = function(args, speaker)
                 if not args[1] then return notify('Player Required', 'No player provided') end
+                
+                local targets = getPlayer(args[1], speaker)
+                if #targets > 1 then
+                    return notify("Error", "Loop NaN Fling only works on one player at a time!")
+                end
+                
                 executeFling(args[1], speaker, true)
             end
         },
 
         ["unloopnanfling"] = {
-            ["ListName"] = "unloopnanfling [plr]",
-            ["Description"] = "Stop loop nanfling on a player",
+            ["ListName"] = "unloopnanfling",
+            ["Description"] = "Stop all active loop nanfling",
             ["Aliases"] = {"unlnf", "unloopnanf", "unloopnf", "unloopnfling"},
             ["Function"] = function(args, speaker)
-                if not args[1] then return notify('Player Required', 'No player provided') end
-                
-                local found = false
-                for _, v in next, getPlayer(args[1], speaker) do
-                    local trgt = Players:FindFirstChild(v)
-                    if trgt and activeLoops[trgt] then
-                        activeLoops[trgt]:Disconnect()
-                        activeLoops[trgt] = nil
-                        notify("Loop Stopped", "Stopped loop nanfling on " .. trgt.Name)
-                        found = true
-                    end
-                end
-                
-                if not found then
-                    notify("Not Found", "No active loop found for that player")
+                if activeLoopTarget then
+                    activeLoopTarget:Disconnect()
+                    activeLoopTarget = nil
+                    notify("Loop Stopped", "All loop nanfling has been stopped")
+                else
+                    notify("No Loop", "There is no active loop nanfling running")
                 end
             end
         }
@@ -76,7 +73,6 @@ function executeFling(targetName, speaker, isLoop)
             
             if not (hrp and hum and trgt_hrp) then return end
 
-            -- Smart Nanfling Duration Logic
             local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() or 999
             local distance = (hrp.Position - trgt_hrp.Position).Magnitude
             local flingDuration = 1.5
@@ -107,7 +103,6 @@ function executeFling(targetName, speaker, isLoop)
 
                 if hum then hum.Jump = true end
 
-                -- Nanfling Phase
                 if elapsed < flingDuration and char.Parent and trgt_chr.Parent then
                     hrp.CFrame = trgt_hrp.CFrame
                     hrp.AssemblyLinearVelocity = nan_vector
@@ -121,7 +116,6 @@ function executeFling(targetName, speaker, isLoop)
                         end)
                     end
                 else
-                    -- Return Phase
                     if not returnConnection then
                         returnConnection = Runservice.Heartbeat:Connect(function()
                             if not hrp or not hrp.Parent then
@@ -137,7 +131,6 @@ function executeFling(targetName, speaker, isLoop)
                         end)
                     end
 
-                    -- Move Forward
                     if hum then
                         local forwardDir = hrp.CFrame.LookVector
                         forwardDir = Vector3.new(forwardDir.X, 0, forwardDir.Z).Unit
@@ -150,11 +143,17 @@ function executeFling(targetName, speaker, isLoop)
         doFling()
 
         if isLoop then
+            -- Only allow one loop at a time
+            if activeLoopTarget then
+                activeLoopTarget:Disconnect()
+            end
+
             loopConnection = trgt.CharacterAdded:Connect(function()
                 task.wait(0.5)
                 doFling()
             end)
-            activeLoops[trgt] = loopConnection
+            
+            activeLoopTarget = loopConnection
             notify("Loop Active", "Loop nanfling is now running on " .. trgt.Name)
         end
     end
