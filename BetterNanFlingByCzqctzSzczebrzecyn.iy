@@ -9,11 +9,11 @@ local Plugin = {
     ["Commands"] = {
         ["nanfling"] = {
             ["ListName"] = "nanfling [plr]",
-            ["Description"] = "Smart nanfling + instant return when done",
+            ["Description"] = "Smart nanfling - stops when target humanoid is gone",
             ["Aliases"] = {"nfling", "nanf", "nf"},
             ["Function"] = function(args, speaker)
                 if not args[1] then return notify('Player Required', 'No player provided') end
-                executeFling(args[1], speaker, false, 1.5)
+                executeFling(args[1], speaker, false)
             end
         },
 
@@ -23,7 +23,7 @@ local Plugin = {
             ["Aliases"] = {"loopnf", "lnf", "loopnanf", "loopnfling"},
             ["Function"] = function(args, speaker)
                 if not args[1] then return notify('Player Required', 'No player provided') end
-                executeFling(args[1], speaker, true, 1.5)
+                executeFling(args[1], speaker, true)
             end
         },
 
@@ -39,12 +39,14 @@ local Plugin = {
     }
 }
 
-function executeFling(targetName, speaker, isLoop, customDuration)
+function executeFling(targetName, speaker, isLoop)
     local nan_vector = Vector3.new(0/0, 0/0, 0/0)
     
     for _, v in next, getPlayer(targetName, speaker) do
         local trgt = Players:FindFirstChild(v)
         if not trgt or trgt == speaker then continue end
+
+        notify("Fling Started", isLoop and ("Loop nanfling enabled on " .. trgt.Name) or ("Nanflinging " .. trgt.Name))
 
         local loopConnection = nil
 
@@ -60,45 +62,51 @@ function executeFling(targetName, speaker, isLoop, customDuration)
 
             local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() or 999
             local distance = (hrp.Position - trgt_hrp.Position).Magnitude
-            local flingDuration = customDuration or ((ping < 100 or distance <= 10) and 0.8 or 1.5)
+            local flingDuration = (ping < 100 or distance <= 10) and 0.8 or 1.5
 
             local originalCFrame = hrp.CFrame
+            local totalStartTime = tick()
             local returnConnection = nil
 
             hum.PlatformStand = true
 
             local mainConnection
             mainConnection = Runservice.Heartbeat:Connect(function()
-                -- Immediate stop if target is gone
-                if not trgt_chr.Parent or not trgt_hrp.Parent then
+                -- Stop immediately if target's Humanoid is no longer detected
+                if not trgt_chr:FindFirstChildOfClass("Humanoid") or not trgt_hrp.Parent then
                     mainConnection:Disconnect()
                     if returnConnection then returnConnection:Disconnect() end
-                    cleanup()
+                    
+                    -- Instant return + clear velocity
+                    if hrp and hrp.Parent then
+                        hrp.CFrame = originalCFrame
+                        hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                        hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                    end
+                    
+                    if hum then 
+                        hum.PlatformStand = false 
+                        hum.Jump = false
+                    end
                     return
                 end
 
-                local elapsed = tick() - (originalCFrame and 0 or 0) -- using start time properly below
+                local elapsed = tick() - totalStartTime
 
-                -- Better timing
-                -- (We'll set startTime inside the connection start)
-
-            end)
-
-            -- Proper start time
-            local startTime = tick()
-
-            mainConnection = Runservice.Heartbeat:Connect(function()
-                if not trgt_chr.Parent or not trgt_hrp.Parent then
+                if elapsed >= 3 then
                     mainConnection:Disconnect()
                     if returnConnection then returnConnection:Disconnect() end
-                    cleanup()
+                    if hum then 
+                        hum.Jump = false
+                        hum.PlatformStand = false 
+                    end
                     return
                 end
 
-                local elapsed = tick() - startTime
+                if hum then hum.Jump = true end
 
-                -- Nanfling Phase
                 if elapsed < flingDuration then
+                    -- Nanfling Phase
                     hrp.CFrame = trgt_hrp.CFrame
                     hrp.AssemblyLinearVelocity = nan_vector
                     hrp.AssemblyAngularVelocity = nan_vector
@@ -111,51 +119,29 @@ function executeFling(targetName, speaker, isLoop, customDuration)
                         end)
                     end
                 else
-                    -- Fling ended → Teleport back immediately and cleanup
-                    mainConnection:Disconnect()
-                    if returnConnection then returnConnection:Disconnect() end
-                    
-                    -- Instant return + clear velocity
-                    hrp.CFrame = originalCFrame
-                    hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                    hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-                    
+                    -- Return Phase
+                    if not returnConnection then
+                        returnConnection = Runservice.Heartbeat:Connect(function()
+                            if not hrp or not hrp.Parent then
+                                returnConnection:Disconnect()
+                                return
+                            end
+                            
+                            if (hrp.CFrame.Position - originalCFrame.Position).Magnitude > 1 then
+                                hrp.CFrame = originalCFrame
+                                hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                                hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                            end
+                        end)
+                    end
+
                     if hum then
-                        hum.PlatformStand = false
-                        hum.Jump = false
+                        local forwardDir = hrp.CFrame.LookVector
+                        forwardDir = Vector3.new(forwardDir.X, 0, forwardDir.Z).Unit
+                        hum:Move(forwardDir, true)
                     end
-
-                    notify("Fling Complete", "Returned to original position")
-                    return
                 end
             end)
-
-            -- Return loop (only active after fling ends, in case something moves you)
-            task.delay(flingDuration + 0.1, function()
-                if not mainConnection.Connected then return end
-                
-                returnConnection = Runservice.Heartbeat:Connect(function()
-                    if not hrp or not hrp.Parent then
-                        returnConnection:Disconnect()
-                        return
-                    end
-                    
-                    if (hrp.CFrame.Position - originalCFrame.Position).Magnitude > 1 then
-                        hrp.CFrame = originalCFrame
-                        hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                        hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-                    end
-                end)
-            end)
-
-            function cleanup()
-                if hum then
-                    hum.PlatformStand = false
-                    hum.Jump = false
-                end
-                hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-            end
         end
 
         doFling()
