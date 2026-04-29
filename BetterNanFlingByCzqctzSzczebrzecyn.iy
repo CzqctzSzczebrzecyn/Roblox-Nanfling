@@ -5,11 +5,11 @@ local activeLoops = {}
 
 local Plugin = {
     ["PluginName"] = "NaN Fling",
-    ["PluginDescription"] = "NaN Fling with loop support + smart duration",
+    ["PluginDescription"] = "Better NaN Fling coded by Czqctz Szczebrzecyn",
     ["Commands"] = {
         ["nanfling"] = {
             ["ListName"] = "nanfling [plr]",
-            ["Description"] = "Smart nanfling (0.8s if low ping or close range)",
+            ["Description"] = "Fling a player straight into the void",
             ["Aliases"] = {"nfling", "nanf", "nf"},
             ["Function"] = function(args, speaker)
                 if not args[1] then return notify('Player Required', 'No player provided') end
@@ -19,7 +19,7 @@ local Plugin = {
 
         ["loopnanfling"] = {
             ["ListName"] = "loopnanfling [plr]",
-            ["Description"] = "Repeatedly nanfling player every time they respawn",
+            ["Description"] = "Repeatedly nanfling a player every time they respawn",
             ["Aliases"] = {"loopnf", "lnf", "loopnanf", "loopnfling"},
             ["Function"] = function(args, speaker)
                 if not args[1] then return notify('Player Required', 'No player provided') end
