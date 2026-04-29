@@ -1,7 +1,7 @@
 local Runservice = cloneref(game:GetService("RunService"))
 local Players = cloneref(game:GetService("Players"))
 
-local activeLoopTarget = nil  -- Now only tracks one loop at a time
+local activeLoopTarget = nil
 
 local Plugin = {
     ["PluginName"] = "NaN Fling",
@@ -73,12 +73,13 @@ function executeFling(targetName, speaker, isLoop)
             
             if not (hrp and hum and trgt_hrp) then return end
 
+            -- Smart Duration: 1 second if low ping or close
             local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() or 999
             local distance = (hrp.Position - trgt_hrp.Position).Magnitude
             local flingDuration = 1.5
 
             if ping < 100 or distance <= 12 then
-                flingDuration = 0.8
+                flingDuration = 1.0
             end
 
             local originalCFrame = hrp.CFrame
@@ -101,8 +102,16 @@ function executeFling(targetName, speaker, isLoop)
                     return
                 end
 
-                if hum then hum.Jump = true end
+                -- Force stand up if sat down or tripped
+                if hum then
+                    hum.Jump = true
+                    if hum.PlatformStand or hum.Sit then
+                        hum.PlatformStand = false
+                        hum.Sit = false
+                    end
+                end
 
+                -- Nanfling Phase
                 if elapsed < flingDuration and char.Parent and trgt_chr.Parent then
                     hrp.CFrame = trgt_hrp.CFrame
                     hrp.AssemblyLinearVelocity = nan_vector
@@ -116,6 +125,7 @@ function executeFling(targetName, speaker, isLoop)
                         end)
                     end
                 else
+                    -- Return Phase
                     if not returnConnection then
                         returnConnection = Runservice.Heartbeat:Connect(function()
                             if not hrp or not hrp.Parent then
@@ -131,6 +141,7 @@ function executeFling(targetName, speaker, isLoop)
                         end)
                     end
 
+                    -- Move Forward
                     if hum then
                         local forwardDir = hrp.CFrame.LookVector
                         forwardDir = Vector3.new(forwardDir.X, 0, forwardDir.Z).Unit
@@ -143,7 +154,6 @@ function executeFling(targetName, speaker, isLoop)
         doFling()
 
         if isLoop then
-            -- Only allow one loop at a time
             if activeLoopTarget then
                 activeLoopTarget:Disconnect()
             end
