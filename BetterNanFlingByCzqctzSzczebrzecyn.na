@@ -1,43 +1,38 @@
-local Runservice = cloneref(game:GetService("RunService"))
-local Players = cloneref(game:GetService("Players"))
-
-local activeLoopTarget = nil
-
 local Plugin = {
-    ["PluginName"] = "NaN Fling",
-    ["PluginDescription"] = "Better NaN Fling - Compatible with Nameless Admin",
-    ["Commands"] = {
+    PluginName = "NaN Fling",
+    PluginDescription = "Better NaN Fling",
+    Commands = {
         ["nanfling"] = {
-            ["ListName"] = "nanfling [plr]",
-            ["Description"] = "Fling a player straight into the void",
-            ["Aliases"] = {"nfling", "nanf", "nf"},
-            ["Function"] = function(args, speaker)
+            ListName = "nanfling [plr]",
+            Description = "Fling a player straight into the void",
+            Aliases = {"nfling", "nanf", "nf"},
+            Function = function(args)
                 if not args[1] then return notify('Player Required', 'No player provided') end
-                executeFling(args[1], speaker or Players.LocalPlayer, false)
+                executeFling(args[1], false)
             end
         },
 
         ["loopnanfling"] = {
-            ["ListName"] = "loopnanfling [plr]",
-            ["Description"] = "Repeatedly nanfling a player every time they respawn (one player only)",
-            ["Aliases"] = {"loopnf", "lnf", "loopnanf", "loopnfling"},
-            ["Function"] = function(args, speaker)
+            ListName = "loopnanfling [plr]",
+            Description = "Repeatedly nanfling a player every time they respawn (one at a time)",
+            Aliases = {"loopnf", "lnf", "loopnanf", "loopnfling"},
+            Function = function(args)
                 if not args[1] then return notify('Player Required', 'No player provided') end
                 
-                local targets = getPlayer(args[1], speaker or Players.LocalPlayer)
+                local targets = getPlayer(args[1])
                 if #targets > 1 then
                     return notify("Error", "Loop NaN Fling only works on one player at a time!")
                 end
                 
-                executeFling(args[1], speaker or Players.LocalPlayer, true)
+                executeFling(args[1], true)
             end
         },
 
         ["unloopnanfling"] = {
-            ["ListName"] = "unloopnanfling",
-            ["Description"] = "Stop all active loop nanfling",
-            ["Aliases"] = {"unlnf", "unloopnanf", "unloopnf", "unloopnfling"},
-            ["Function"] = function(args, speaker)
+            ListName = "unloopnanfling",
+            Description = "Stop all active loop nanfling",
+            Aliases = {"unlnf", "unloopnanf", "unloopnf", "unloopnfling"},
+            Function = function()
                 if activeLoopTarget then
                     activeLoopTarget:Disconnect()
                     activeLoopTarget = nil
@@ -50,19 +45,23 @@ local Plugin = {
     }
 }
 
-function executeFling(targetName, speaker, isLoop)
+local activeLoopTarget = nil
+local Runservice = cloneref(game:GetService("RunService"))
+local Players = cloneref(game:GetService("Players"))
+
+function executeFling(targetName, isLoop)
     local nan_vector = Vector3.new(0/0, 0/0, 0/0)
     
-    for _, v in next, getPlayer(targetName, speaker) do
+    for _, v in next, getPlayer(targetName) do
         local trgt = Players:FindFirstChild(v)
-        if not trgt or trgt == speaker then continue end
+        if not trgt or trgt == Players.LocalPlayer then continue end
         
         notify("Fling Started", isLoop and ("Loop nanfling enabled on " .. trgt.Name) or ("Nanflinging " .. trgt.Name))
 
         local loopConnection = nil
 
         local function doFling()
-            local char = speaker.Character
+            local char = Players.LocalPlayer.Character
             local trgt_chr = trgt.Character
             
             if not char or not trgt_chr then return end
@@ -73,7 +72,6 @@ function executeFling(targetName, speaker, isLoop)
             
             if not (hrp and hum and trgt_hrp) then return end
 
-            -- Smart Nanfling Duration Logic
             local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() or 999
             local distance = (hrp.Position - trgt_hrp.Position).Magnitude
             local flingDuration = 1.5
@@ -104,7 +102,6 @@ function executeFling(targetName, speaker, isLoop)
 
                 if hum then hum.Jump = true end
 
-                -- Nanfling Phase
                 if elapsed < flingDuration and char.Parent and trgt_chr.Parent then
                     hrp.CFrame = trgt_hrp.CFrame
                     hrp.AssemblyLinearVelocity = nan_vector
@@ -118,7 +115,6 @@ function executeFling(targetName, speaker, isLoop)
                         end)
                     end
                 else
-                    -- Return Phase
                     if not returnConnection then
                         returnConnection = Runservice.Heartbeat:Connect(function()
                             if not hrp or not hrp.Parent then
@@ -134,7 +130,6 @@ function executeFling(targetName, speaker, isLoop)
                         end)
                     end
 
-                    -- Move Forward
                     if hum then
                         local forwardDir = hrp.CFrame.LookVector
                         forwardDir = Vector3.new(forwardDir.X, 0, forwardDir.Z).Unit
@@ -162,4 +157,5 @@ function executeFling(targetName, speaker, isLoop)
     end
 end
 
-return Plugin
+-- This is what Nameless Admin needs
+return cmdPluginAdd(Plugin)
