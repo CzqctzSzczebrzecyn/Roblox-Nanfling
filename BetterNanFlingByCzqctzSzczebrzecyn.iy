@@ -73,11 +73,16 @@ function executeFling(targetName, speaker, isLoop)
             
             if not (hrp and hum and trgt_hrp) then return end
 
+            -- Optimized Smart Duration Logic
             local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() or 999
             local distance = (hrp.Position - trgt_hrp.Position).Magnitude
             local flingDuration = 1.5
 
-            if ping < 100 or distance <= 12 then
+            -- If ping is over 150, always use 1.5 seconds
+            if ping > 150 then
+                flingDuration = 1.5
+            -- Otherwise use smart logic (1 second if low ping or close)
+            elseif ping < 100 or distance <= 12 then
                 flingDuration = 1.0
             end
 
