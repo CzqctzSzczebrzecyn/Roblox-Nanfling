@@ -73,13 +73,12 @@ function executeFling(targetName, speaker, isLoop)
             
             if not (hrp and hum and trgt_hrp) then return end
 
-            -- Smart Nanfling Duration Logic
             local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() or 999
             local distance = (hrp.Position - trgt_hrp.Position).Magnitude
             local flingDuration = 1.5
 
             if ping < 100 or distance <= 12 then
-                flingDuration = 1.0        -- Changed back to 1 second
+                flingDuration = 1.0
             end
 
             local originalCFrame = hrp.CFrame
@@ -104,7 +103,6 @@ function executeFling(targetName, speaker, isLoop)
 
                 if hum then hum.Jump = true end
 
-                -- Nanfling Phase
                 if elapsed < flingDuration and char.Parent and trgt_chr.Parent then
                     hrp.CFrame = trgt_hrp.CFrame
                     hrp.AssemblyLinearVelocity = nan_vector
@@ -118,7 +116,6 @@ function executeFling(targetName, speaker, isLoop)
                         end)
                     end
                 else
-                    -- Return Phase
                     if not returnConnection then
                         returnConnection = Runservice.Heartbeat:Connect(function()
                             if not hrp or not hrp.Parent then
@@ -134,7 +131,6 @@ function executeFling(targetName, speaker, isLoop)
                         end)
                     end
 
-                    -- Move Forward
                     if hum then
                         local forwardDir = hrp.CFrame.LookVector
                         forwardDir = Vector3.new(forwardDir.X, 0, forwardDir.Z).Unit
