@@ -1,0 +1,175 @@
+-- =============================================
+-- Auto Say on Join + Respawn
+-- Clean UI with TextBox and Checkbox
+-- =============================================
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+print("✅ Auto Say UI Loaded for " .. LocalPlayer.Name)
+
+-- Create ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AutoSayUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game:GetService("CoreGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 300, 0, 240)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -120)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+-- Title
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Title.Text = "Auto Say on Join & Respawn"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.TextSize = 17
+Title.Font = Enum.Font.GothamBold
+Title.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = Title
+
+-- Close Button
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -35, 0, 5)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+CloseBtn.Text = "✕"
+CloseBtn.TextColor3 = Color3.new(1,1,1)
+CloseBtn.TextSize = 18
+CloseBtn.Parent = MainFrame
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 6)
+CloseCorner.Parent = CloseBtn
+
+-- Content
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, -20, 1, -55)
+Content.Position = UDim2.new(0, 10, 0, 45)
+Content.BackgroundTransparency = 1
+Content.Parent = MainFrame
+
+-- Checkbox
+local CheckBox = Instance.new("TextButton")
+CheckBox.Size = UDim2.new(0, 20, 0, 20)
+CheckBox.Position = UDim2.new(0, 0, 0, 10)
+CheckBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+CheckBox.Text = ""
+CheckBox.Parent = Content
+
+local CheckCorner = Instance.new("UICorner")
+CheckCorner.CornerRadius = UDim.new(0, 4)
+CheckCorner.Parent = CheckBox
+
+local CheckLabel = Instance.new("TextLabel")
+CheckLabel.Size = UDim2.new(1, -30, 0, 20)
+CheckLabel.Position = UDim2.new(0, 30, 0, 10)
+CheckLabel.BackgroundTransparency = 1
+CheckLabel.Text = "Enable Auto Say on Join & Respawn"
+CheckLabel.TextColor3 = Color3.new(1,1,1)
+CheckLabel.TextSize = 14
+CheckLabel.Font = Enum.Font.Gotham
+CheckLabel.TextXAlignment = Enum.TextXAlignment.Left
+CheckLabel.Parent = Content
+
+-- TextBox Label
+local TextBoxLabel = Instance.new("TextLabel")
+TextBoxLabel.Size = UDim2.new(1, 0, 0, 20)
+TextBoxLabel.Position = UDim2.new(0, 0, 0, 45)
+TextBoxLabel.BackgroundTransparency = 1
+TextBoxLabel.Text = "Command (without the ;)"
+TextBoxLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+TextBoxLabel.TextSize = 13
+TextBoxLabel.Font = Enum.Font.Gotham
+TextBoxLabel.TextXAlignment = Enum.TextXAlignment.Left
+TextBoxLabel.Parent = Content
+
+-- TextBox
+local TextBox = Instance.new("TextBox")
+TextBox.Size = UDim2.new(1, 0, 0, 35)
+TextBox.Position = UDim2.new(0, 0, 0, 70)
+TextBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+TextBox.Text = "r6"
+TextBox.TextColor3 = Color3.new(1,1,1)
+TextBox.TextSize = 16
+TextBox.Font = Enum.Font.Gotham
+TextBox.PlaceholderText = "e.g. r6, reset, sit"
+TextBox.Parent = Content
+
+local TextCorner = Instance.new("UICorner")
+TextCorner.CornerRadius = UDim.new(0, 6)
+TextCorner.Parent = TextBox
+
+-- Variables
+local Enabled = false
+local CommandText = "r6"
+
+-- Checkbox Toggle
+CheckBox.MouseButton1Click:Connect(function()
+    Enabled = not Enabled
+    CheckBox.BackgroundColor3 = Enabled and Color3.fromRGB(0, 170, 100) or Color3.fromRGB(50, 50, 50)
+end)
+
+-- Update command text
+TextBox:GetPropertyChangedSignal("Text"):Connect(function()
+    CommandText = TextBox.Text
+end)
+
+-- Function to send the message
+local function AutoSay(player)
+    if not Enabled or not player or player == LocalPlayer then return end
+    if not CommandText or CommandText == "" then return end
+
+    local message = ";" .. CommandText .. " " .. player.Name
+    
+    -- Fire chat message
+    local success, err = pcall(function()
+        game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, "All")
+    end)
+    
+    if success then
+        print("Auto Said: " .. message)
+    else
+        warn("Failed to send message: " .. tostring(err))
+    end
+end
+
+-- When a NEW player joins
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        wait(1.5) -- Small delay to let character load properly
+        AutoSay(player)
+    end)
+end)
+
+-- For players already in the server (including yourself - but we skip self)
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer and player.Character then
+        player.CharacterAdded:Connect(function()
+            wait(1.5)
+            AutoSay(player)
+        end)
+    end
+end)
+
+-- Close Button
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+    print("UI Closed")
+end)
+
+print("🎉 UI Ready!")
+print("Auto Say is now active on both Player Join and Respawn.")
