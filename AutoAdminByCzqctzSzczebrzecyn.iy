@@ -1,0 +1,189 @@
+local Players = cloneref(game:GetService("Players"))
+local TextChatService = game:GetService("TextChatService")
+
+local allowedCommands = {
+    "r6", "r15", "fly", "bring", "food", "carpet", "protest", 
+    "sign", "noclip", "tospawn", "reset", "oof", "drone", 
+    "monke", "toy", "stand", "clicktp"
+}
+
+local lastTriggered = {}           -- Per-player cooldown
+local recentTriggers = {}          -- Track triggers in last 7 seconds
+local globalCooldownUntil = 0      -- Timestamp when global cooldown ends
+
+local Plugin = {
+    ["PluginName"] = "AutoAdmin Responder",
+    ["PluginDescription"] = "Auto replies with ;command username + Global anti-spam (5 triggers in 7s = 15s lockdown)",
+    ["Commands"] = {
+        ["autoadmin"] = {
+            ["ListName"] = "autoadmin on/off",
+            ["Description"] = "Enable or disable the AutoAdmin! detector",
+            ["Aliases"] = {"aa", "aadmin"},
+            ["Function"] = function(args, speaker)
+                local state = args[1] and args[1]:lower()
+                
+                if state == "on" then
+                    getgenv().AutoAdminEnabled = true
+                    globalCooldownUntil = 0
+                    notify("AutoAdmin", "✅ AutoAdmin detector is now **ENABLED**")
+                elseif state == "off" then
+                    getgenv().AutoAdminEnabled = false
+                    notify("AutoAdmin", "❌ AutoAdmin detector is now **DISABLED**")
+                else
+                    notify("AutoAdmin", "Status: " .. (getgenv().AutoAdminEnabled and "ON" or "OFF"))
+                end
+            end
+        }
+    }
+}
+
+if getgenv().AutoAdminEnabled == nil then
+    getgenv().AutoAdminEnabled = true
+end
+
+local function sendInChat(command, targetName)
+    local fullMessage = ";" .. command .. " " .. targetName
+
+    pcall(function()
+        local channel = TextChatService:WaitForChild("TextChannels"):WaitForChild("RBXGeneral")
+        channel:SendAsync(fullMessage)
+    end)
+
+    pcall(function()
+        local hum = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum:Chat(fullMessage) end
+    end)
+
+    pcall(function()
+        game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(fullMessage, "All")
+    end)
+end
+
+local function isGlobalCooldownActive()
+    return tick() < globalCooldownUntil
+end
+
+local function triggerGlobalCooldown()
+    if isGlobalCooldownActive() then return end
+    
+    globalCooldownUntil = tick() + 15
+    notify("🚨 AutoAdmin Overload", "Too many people are using Auto Admin!\nCooldown Period of 15 seconds", 8)
+
+    task.delay(15, function()
+        if tick() >= globalCooldownUntil then
+            globalCooldownUntil = 0
+            notify("✅ AutoAdmin", "Auto Admin back online")
+        end
+    end)
+end
+
+local function onChatMessage(textChatMessage)
+    if not getgenv().AutoAdminEnabled then return end
+    if not textChatMessage.TextSource then return end
+
+    local sender = Players:GetPlayerByUserId(textChatMessage.TextSource.UserId)
+    if not sender or sender == Players.LocalPlayer then return end
+
+    local msg = textChatMessage.Text
+
+    if msg:sub(1, 10) == "AutoAdmin!" then
+        local command = msg:sub(11):match("^%s*(.-)%s*$"):lower()
+
+        if not allowedCommands[command] then return end
+
+        local now = tick()
+
+        -- Check global cooldown
+        if isGlobalCooldownActive() then
+            return
+        end
+
+        -- Check per-player cooldown
+        local lastTime = lastTriggered[sender] or 0
+        if now - lastTime < 15 then
+            return
+        end
+
+        -- Record this trigger for global spam detection
+        table.insert(recentTriggers, {time = now, player = sender})
+
+        -- Clean old triggers (older than 7 seconds)
+        for i = #recentTriggers, 1, -1 do
+            if now - recentTriggers[i].time > 7 then
+                table.remove(recentTriggers, i)
+            end
+        end
+
+        -- Check if 5+ people triggered within 7 seconds
+        if #recentTriggers >= 5 then
+            triggerGlobalCooldown()
+            return
+        end
+
+        -- Normal trigger (allowed)
+        lastTriggered[sender] = now
+
+        notify("AutoAdmin", sender.Name .. " → " .. command)
+
+        task.spawn(function()
+            task.wait(0.4)
+            sendInChat(command, sender.Name)
+        end)
+    end
+end
+
+-- ==================== CHAT LISTENING ====================
+
+if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+    TextChatService.MessageReceived:Connect(function(textChatMessage)
+        if textChatMessage.Status == Enum.TextChatMessageStatus.Success then
+            onChatMessage(textChatMessage)
+        end
+    end)
+else
+    local chatEvents = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
+    if chatEvents then
+        chatEvents.OnMessageDoneFiltering.OnClientEvent:Connect(function(data)
+            if not getgenv().AutoAdminEnabled then return end
+            local sender = Players:FindFirstChild(data.FromSpeaker)
+            if sender and sender ~= Players.LocalPlayer then
+                local msg = data.Message
+                if msg:sub(1, 10) == "AutoAdmin!" then
+                    local command = msg:sub(11):match("^%s*(.-)%s*$"):lower()
+                    if allowedCommands[command] then
+                        local now = tick()
+                        if isGlobalCooldownActive() then return end
+
+                        local lastTime = lastTriggered[sender] or 0
+                        if now - lastTime < 15 then return end
+
+                        table.insert(recentTriggers, {time = now, player = sender})
+
+                        for i = #recentTriggers, 1, -1 do
+                            if now - recentTriggers[i].time > 7 then
+                                table.remove(recentTriggers, i)
+                            end
+                        end
+
+                        if #recentTriggers >= 5 then
+                            triggerGlobalCooldown()
+                            return
+                        end
+
+                        lastTriggered[sender] = now
+
+                        notify("AutoAdmin", sender.Name .. " → " .. command)
+                        task.spawn(function()
+                            task.wait(0.4)
+                            sendInChat(command, sender.Name)
+                        end)
+                    end
+                end
+            end
+        end)
+    end
+end
+
+notify("AutoAdmin Responder Loaded", "15s per-player cooldown + Global anti-spam (5 triggers in 7s = 15s lockdown)\nType 'autoadmin on' to enable")
+
+return Plugin
