@@ -1,0 +1,423 @@
+-- Evitamos duplicación si el plugin se recarga más de una vez
+if game:GetService("CoreGui"):FindFirstChild("NaNFlingUI") then
+    game:GetService("CoreGui"):FindFirstChild("NaNFlingUI"):Destroy()
+end
+
+local Runservice = cloneref(game:GetService("RunService"))
+local Players = cloneref(game:GetService("Players"))
+local TweenService = cloneref(game:GetService("TweenService"))
+local UserInputService = cloneref(game:GetService("UserInputService"))
+
+-- ── INTERFAZ VISUAL (GUI) ──
+local gui = Instance.new("ScreenGui")
+gui.Name = "NaNFlingUI"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
+
+local TOGGLE_POS  = UDim2.new(0, 12, 0, 60)
+local TOGGLE_SIZE = UDim2.new(0, 44, 0, 44)
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size             = TOGGLE_SIZE
+toggleBtn.Position         = TOGGLE_POS
+toggleBtn.BackgroundColor3 = Color3.fromRGB(130, 12, 12)
+toggleBtn.Text             = "🥊"
+toggleBtn.TextSize         = 20
+toggleBtn.Font             = Enum.Font.GothamBold
+toggleBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
+toggleBtn.BorderSizePixel  = 0
+toggleBtn.ZIndex           = 10
+toggleBtn.Parent           = gui
+
+local tc = Instance.new("UICorner"); tc.CornerRadius = UDim.new(0,10); tc.Parent = toggleBtn
+local ts = Instance.new("UIStroke"); ts.Color = Color3.fromRGB(180,20,20); ts.Thickness = 2; ts.Parent = toggleBtn
+
+TweenService:Create(ts, TweenInfo.new(1.0, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+	Color = Color3.fromRGB(255,255,255), Transparency = 0.1
+}):Play()
+
+local function animateToggleClick()
+	TweenService:Create(toggleBtn, TweenInfo.new(0.09, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = UDim2.new(0,52,0,52), Position = UDim2.new(0,8,0,56),
+		BackgroundColor3 = Color3.fromRGB(255,255,255)
+	}):Play()
+	TweenService:Create(ts, TweenInfo.new(0.09), {Thickness = 4, Transparency = 0}):Play()
+	task.delay(0.12, function()
+		TweenService:Create(toggleBtn, TweenInfo.new(0.38, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {
+			Size = TOGGLE_SIZE, Position = TOGGLE_POS,
+			BackgroundColor3 = Color3.fromRGB(130,12,12)
+		}):Play()
+		TweenService:Create(ts, TweenInfo.new(0.25), {Thickness = 2}):Play()
+	end)
+end
+
+local W, H = 280, 220
+local panel = Instance.new("Frame")
+panel.Size = UDim2.new(0,W,0,H); panel.Position = UDim2.new(0,12,0,112)
+panel.BackgroundColor3 = Color3.fromRGB(14,4,4); panel.BorderSizePixel = 0
+panel.ClipsDescendants = true; panel.ZIndex = 5; panel.Parent = gui
+local pc = Instance.new("UICorner"); pc.CornerRadius = UDim.new(0,12); pc.Parent = panel
+local ps = Instance.new("UIStroke"); ps.Color = Color3.fromRGB(160,20,20); ps.Thickness = 2; ps.Parent = panel
+
+TweenService:Create(ps, TweenInfo.new(0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+	Color = Color3.fromRGB(255,255,255), Transparency = 0
+}):Play()
+
+local topBar = Instance.new("Frame")
+topBar.Size = UDim2.new(0,W,0,34); topBar.Position = UDim2.new(0,0,0,0)
+topBar.BackgroundColor3 = Color3.fromRGB(26,6,6); topBar.BorderSizePixel = 0
+topBar.ZIndex = 6; topBar.Parent = panel
+local tbc = Instance.new("UICorner"); tbc.CornerRadius = UDim.new(0,12); tbc.Parent = topBar
+local tbfix = Instance.new("Frame")
+tbfix.Size = UDim2.new(1,0,0,12); tbfix.Position = UDim2.new(0,0,1,-12)
+tbfix.BackgroundColor3 = Color3.fromRGB(26,6,6); tbfix.BorderSizePixel = 0; tbfix.ZIndex = 6; tbfix.Parent = topBar
+
+local dot = Instance.new("Frame")
+dot.Size = UDim2.new(0,9,0,9); dot.Position = UDim2.new(0,12,0.5,-4)
+dot.BackgroundColor3 = Color3.fromRGB(200,20,20); dot.BorderSizePixel = 0; dot.ZIndex = 7; dot.Parent = topBar
+local dc = Instance.new("UICorner"); dc.CornerRadius = UDim.new(1,0); dc.Parent = dot
+TweenService:Create(dot, TweenInfo.new(0.75, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+	BackgroundColor3 = Color3.fromRGB(255,255,255)
+}):Play()
+
+local titleLbl = Instance.new("TextLabel")
+titleLbl.Text = "NaN Fling"; titleLbl.Font = Enum.Font.GothamBold; titleLbl.TextSize = 13
+titleLbl.TextColor3 = Color3.fromRGB(255,200,200); titleLbl.BackgroundTransparency = 1
+titleLbl.Position = UDim2.new(0,28,0,0); titleLbl.Size = UDim2.new(0,160,1,0)
+titleLbl.TextXAlignment = Enum.TextXAlignment.Left; titleLbl.ZIndex = 7; titleLbl.Parent = topBar
+
+-- Sistema de arrastre (Drag)
+local dragging, dragStart, frameStart
+topBar.InputBegan:Connect(function(i)
+	if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+		dragging = true; dragStart = i.Position; frameStart = panel.Position
+	end
+end)
+topBar.InputEnded:Connect(function(i)
+	if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+		dragging = false
+	end
+end)
+UserInputService.InputChanged:Connect(function(i)
+	if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+		local d = i.Position - dragStart
+		panel.Position = UDim2.new(0, frameStart.X.Offset + d.X, 0, frameStart.Y.Offset + d.Y)
+	end
+end)
+
+local BW = (W - 24 - 8) / 2
+local function makeStroke(parent, col)
+	local s = Instance.new("UIStroke"); s.Color = col; s.Thickness = 1; s.Parent = parent; return s
+end
+
+local nameBg = Instance.new("Frame")
+nameBg.Size = UDim2.new(0,W-24,0,34); nameBg.Position = UDim2.new(0,12,0,42)
+nameBg.BackgroundColor3 = Color3.fromRGB(24,8,8); nameBg.BorderSizePixel = 0; nameBg.ZIndex = 6; nameBg.Parent = panel
+local nbc = Instance.new("UICorner"); nbc.CornerRadius = UDim.new(0,8); nbc.Parent = nameBg
+local nameStroke = makeStroke(nameBg, Color3.fromRGB(110,20,20))
+
+local textbox = Instance.new("TextBox")
+textbox.PlaceholderText = "Nombre o nickname..."; textbox.PlaceholderColor3 = Color3.fromRGB(110,60,60)
+textbox.Text = ""; textbox.Font = Enum.Font.Gotham; textbox.TextSize = 13
+textbox.TextColor3 = Color3.fromRGB(255,215,215); textbox.BackgroundTransparency = 1
+textbox.Size = UDim2.new(1,-16,1,0); textbox.Position = UDim2.new(0,10,0,0)
+textbox.TextXAlignment = Enum.TextXAlignment.Left; textbox.ClearTextOnFocus = true
+textbox.ZIndex = 7; textbox.Parent = nameBg
+textbox.Focused:Connect(function() TweenService:Create(nameStroke,TweenInfo.new(0.18),{Color=Color3.fromRGB(255,255,255)}):Play() end)
+textbox.FocusLost:Connect(function() TweenService:Create(nameStroke,TweenInfo.new(0.18),{Color=Color3.fromRGB(110,20,20)}):Play() end)
+
+local function makeBtn(text, posX, posY, w, h, c1, c2)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0,w,0,h); btn.Position = UDim2.new(0,posX,0,posY)
+	btn.BackgroundColor3 = c1; btn.Text = text; btn.TextSize = 11
+	btn.Font = Enum.Font.GothamBold; btn.TextColor3 = Color3.fromRGB(255,255,255)
+	btn.BorderSizePixel = 0; btn.AutoButtonColor = false; btn.ZIndex = 6; btn.Parent = panel
+	local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0,8); c.Parent = btn
+	local g = Instance.new("UIGradient")
+	g.Color = ColorSequence.new({ColorSequenceKeypoint.new(0,c1),ColorSequenceKeypoint.new(1,c2)})
+	g.Rotation = 90; g.Parent = btn
+	btn.MouseEnter:Connect(function() TweenService:Create(btn,TweenInfo.new(0.12),{BackgroundColor3=c2}):Play() end)
+	btn.MouseLeave:Connect(function() TweenService:Create(btn,TweenInfo.new(0.12),{BackgroundColor3=c1}):Play() end)
+	return btn
+end
+
+local loopBtn = makeBtn("🔁 LOOP: OFF", 12,       84, BW, 34, Color3.fromRGB(150,18,18), Color3.fromRGB(90,8,8))
+local viewBtn = makeBtn("👁 VIEW: OFF",  12+BW+8, 84, BW, 34, Color3.fromRGB(20,60,100),  Color3.fromRGB(10,35,65))
+local loopStroke = Instance.new("UIStroke"); loopStroke.Color = Color3.fromRGB(130,20,20); loopStroke.Thickness = 1.5; loopStroke.Parent = loopBtn
+local viewStroke = Instance.new("UIStroke"); viewStroke.Color = Color3.fromRGB(30,80,160);  viewStroke.Thickness = 1.5; viewStroke.Parent = viewBtn
+
+local function makeMiniTB(placeholder, posX, posY)
+	local bg = Instance.new("Frame")
+	bg.Size = UDim2.new(0,BW,0,28); bg.Position = UDim2.new(0,posX,0,posY)
+	bg.BackgroundColor3 = Color3.fromRGB(20,6,6); bg.BorderSizePixel = 0; bg.ZIndex = 6; bg.Parent = panel
+	local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0,7); c.Parent = bg
+	local s = makeStroke(bg, Color3.fromRGB(90,14,14))
+	local tb = Instance.new("TextBox")
+	tb.PlaceholderText = placeholder; tb.PlaceholderColor3 = Color3.fromRGB(110,55,55); tb.Text = ""
+	tb.Font = Enum.Font.Gotham; tb.TextSize = 11; tb.TextColor3 = Color3.fromRGB(255,200,200)
+	tb.BackgroundTransparency = 1; tb.Size = UDim2.new(1,-14,1,0); tb.Position = UDim2.new(0,8,0,0)
+	tb.TextXAlignment = Enum.TextXAlignment.Left; tb.ClearTextOnFocus = false
+	tb.ZIndex = 7; tb.Parent = bg
+	tb.Focused:Connect(function() TweenService:Create(s,TweenInfo.new(0.15),{Color=Color3.fromRGB(255,255,255)}):Play() end)
+	tb.FocusLost:Connect(function() TweenService:Create(s,TweenInfo.new(0.15),{Color=Color3.fromRGB(90,14,14)}):Play() end)
+	return tb
+end
+
+local heightTB = makeMiniTB("📐 Altura     (def: 0)", 12,       126)
+local speedTB  = makeMiniTB("⚡ Velocidad  (def: 5)", 12+BW+8, 126)
+
+local statusLbl = Instance.new("TextLabel")
+statusLbl.Text = "● Idle"; statusLbl.Font = Enum.Font.Gotham; statusLbl.TextSize = 11
+statusLbl.TextColor3 = Color3.fromRGB(160,70,70); statusLbl.BackgroundTransparency = 1
+statusLbl.Position = UDim2.new(0,12,0,162); statusLbl.Size = UDim2.new(0,W-24,0,18)
+statusLbl.TextXAlignment = Enum.TextXAlignment.Left; statusLbl.ZIndex = 6; statusLbl.Parent = panel
+
+local function setStatus(txt, col)
+	statusLbl.Text = "● "..txt; statusLbl.TextColor3 = col or Color3.fromRGB(160,70,70)
+end
+
+local studsLbl = Instance.new("TextLabel")
+studsLbl.Text = "Distancia: N/A"; studsLbl.Font = Enum.Font.GothamBold; studsLbl.TextSize = 11
+studsLbl.TextColor3 = Color3.fromRGB(255,255,255); studsLbl.BackgroundTransparency = 1
+studsLbl.Position = UDim2.new(0,12,0,182); studsLbl.Size = UDim2.new(0,W-24,0,18)
+studsLbl.TextXAlignment = Enum.TextXAlignment.Left; studsLbl.ZIndex = 6; studsLbl.Parent = panel
+
+local espHighlight = Instance.new("Highlight")
+espHighlight.FillColor = Color3.new(0,0,0); espHighlight.FillTransparency = 0.5
+espHighlight.OutlineTransparency = 0; espHighlight.Parent = gui
+
+-- ── LÓGICA DE ACTUALIZACIÓN VISUAL (HEARTBEAT) ──
+Runservice.Heartbeat:Connect(function()
+	local query = textbox.Text:lower():gsub("%s+","")
+	local trgt = nil
+	if query ~= "" then
+		for _,p in ipairs(Players:GetPlayers()) do
+			if p ~= Players.LocalPlayer and (p.Name:lower():find(query,1,true) or p.DisplayName:lower():gsub("%s+",""):find(query,1,true)) then
+				trgt = p; break
+			end
+		end
+	end
+	local lpChar = Players.LocalPlayer.Character
+	if trgt and trgt.Character and lpChar and lpChar:FindFirstChild("HumanoidRootPart") and trgt.Character:FindFirstChild("HumanoidRootPart") then
+		local dist = (lpChar.HumanoidRootPart.Position - trgt.Character.HumanoidRootPart.Position).Magnitude
+		studsLbl.Text = string.format("Distancia al objetivo: %.1f Studs", dist)
+	else studsLbl.Text = "Distancia: N/A" end
+	if trgt and trgt.Character then
+		espHighlight.Adornee = trgt.Character
+		espHighlight.OutlineColor = Color3.fromHSV(tick() % 3 / 3, 1, 1)
+	else espHighlight.Adornee = nil end
+end)
+
+local panelVisible = true
+toggleBtn.MouseButton1Click:Connect(function()
+	animateToggleClick()
+	panelVisible = not panelVisible
+	if panelVisible then
+		panel.Visible = true
+		TweenService:Create(panel, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size=UDim2.new(0,W,0,H)}):Play()
+		toggleBtn.Text = "🥊"
+	else
+		TweenService:Create(panel, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size=UDim2.new(0,W,0,0)}):Play()
+		task.delay(0.2, function() panel.Visible = false end)
+		toggleBtn.Text = "👁"
+	end
+end)
+
+local function findPlayer(query)
+	if not query or query == "" then return nil end
+	query = query:lower():gsub("%s+","")
+	local speaker = Players.LocalPlayer
+	local all = Players:GetPlayers()
+	for _,p in ipairs(all) do if p~=speaker and p.Name:lower()==query then return p end end
+	for _,p in ipairs(all) do if p~=speaker and p.DisplayName:lower():gsub("%s+","")==query then return p end end
+	for _,p in ipairs(all) do if p~=speaker and p.Name:lower():find(query,1,true) then return p end end
+	for _,p in ipairs(all) do if p~=speaker and p.DisplayName:lower():gsub("%s+",""):find(query,1,true) then return p end end
+	return nil
+end
+
+local function getHeight()
+	local v = tonumber(heightTB.Text)
+	return (v and v == v) and v or 0
+end
+
+local loopActive  = false
+local loopConn    = nil
+local viewActive  = false
+local viewConn    = nil
+local savedCFrame = nil
+
+local function restorePosition()
+	local char = Players.LocalPlayer.Character
+	if char and savedCFrame then
+		local hrp = char:FindFirstChild("HumanoidRootPart")
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		if hrp then hrp.CFrame = savedCFrame end
+		if hum then hum.PlatformStand = false end
+	end
+	savedCFrame = nil
+end
+
+local function startView()
+	if viewConn then viewConn:Disconnect() end
+	local cam = workspace.CurrentCamera
+	viewConn = Runservice.Heartbeat:Connect(function()
+		local trgt = findPlayer(textbox.Text); if not trgt then return end
+		local chr  = trgt.Character;          if not chr  then return end
+		local hum  = chr:FindFirstChildOfClass("Humanoid"); if not hum then return end
+		cam.CameraType = Enum.CameraType.Custom; cam.CameraSubject = hum
+	end)
+end
+
+local function stopView()
+	if viewConn then viewConn:Disconnect(); viewConn = nil end
+	workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+	local char = Players.LocalPlayer.Character
+	if char then
+		workspace.CurrentCamera.CameraSubject = char:FindFirstChildOfClass("Humanoid") or char:FindFirstChild("HumanoidRootPart")
+	end
+end
+
+-- Función nativa para ejecutar el Fling desde la GUI
+local function runFlingAttack(trgt, customDuration)
+	local speaker = Players.LocalPlayer
+	local char = speaker.Character
+	local trgt_chr = trgt.Character
+	if not (char and trgt_chr) then return end
+
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	local trgt_hrp = trgt_chr:FindFirstChild("HumanoidRootPart")
+	if not (hrp and hum and trgt_hrp) then return end
+
+	local nan_vector = Vector3.new(0/0, 0/0, 0/0)
+	local original_cframe = hrp.CFrame
+	hum.PlatformStand = true
+	
+	local start_time = tick()
+	local duration = customDuration or 1.5
+	local attackConn
+	
+	attackConn = Runservice.Heartbeat:Connect(function()
+		local current_time = tick()
+		if (current_time - start_time) >= duration or not char.Parent or not trgt_chr.Parent or not hrp.Parent or not trgt_hrp.Parent then
+			attackConn:Disconnect()
+			if hrp then
+				hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+				hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+				hrp.CFrame = original_cframe
+			end
+			if hum then hum.PlatformStand = false end
+			return
+		end
+		
+		local yOff = getHeight()
+		hrp.CFrame = trgt_hrp.CFrame * CFrame.new(0, yOff, 0)
+		hrp.AssemblyLinearVelocity = nan_vector
+		hrp.AssemblyAngularVelocity = nan_vector
+		pcall(function() hum:Move(nan_vector) end)
+		if sethiddenproperty then pcall(function() sethiddenproperty(hrp, "PhysicsRepRootPart", trgt_hrp) end) end
+	end)
+end
+
+local function startLoop()
+	if loopConn then loopConn:Disconnect(); loopConn = nil end
+	local speaker = Players.LocalPlayer
+	local nan_vector = Vector3.new(0/0, 0/0, 0/0)
+
+	loopConn = Runservice.Heartbeat:Connect(function()
+		local name = textbox.Text
+		if name == "" then return end
+
+		local trgt = findPlayer(name)
+		if not trgt then setStatus("Jugador no encontrado", Color3.fromRGB(255,80,80)); return end
+
+		local char     = speaker.Character
+		local trgt_chr = trgt.Character
+		if not (char and trgt_chr) then return end
+
+		local hrp      = char:FindFirstChild("HumanoidRootPart")
+		local hum      = char:FindFirstChildOfClass("Humanoid")
+		local trgt_hrp = trgt_chr:FindFirstChild("HumanoidRootPart")
+		if not (hrp and hum and trgt_hrp) then return end
+
+		if not savedCFrame then savedCFrame = hrp.CFrame end
+		local yOff = getHeight()
+		
+		hum.PlatformStand = true
+		hrp.CFrame = trgt_hrp.CFrame * CFrame.new(0, yOff, 0)
+		hrp.AssemblyLinearVelocity = nan_vector
+		hrp.AssemblyAngularVelocity = nan_vector
+		pcall(function() hum:Move(nan_vector) end)
+		if sethiddenproperty then pcall(function() sethiddenproperty(hrp, "PhysicsRepRootPart", trgt_hrp) end) end
+	end)
+end
+
+local function stopLoop()
+	if loopConn then loopConn:Disconnect(); loopConn = nil end
+	restorePosition()
+end
+
+loopBtn.MouseButton1Click:Connect(function()
+	loopActive = not loopActive
+	if loopActive then
+		if textbox.Text == "" then setStatus("Escribe un nombre primero", Color3.fromRGB(255,200,0)); loopActive = false; return end
+		loopBtn.Text = "🔁 LOOP: ON"; loopBtn.TextColor3 = Color3.fromRGB(140,255,150)
+		TweenService:Create(loopStroke,TweenInfo.new(0.2),{Color=Color3.fromRGB(60,220,100)}):Play()
+		setStatus("Loop activo", Color3.fromRGB(80,255,130)); startLoop()
+	else
+		loopBtn.Text = "🔁 LOOP: OFF"; loopBtn.TextColor3 = Color3.fromRGB(255,255,255)
+		TweenService:Create(loopStroke,TweenInfo.new(0.2),{Color=Color3.fromRGB(130,20,20)}):Play()
+		setStatus("Loop off · regresaste", Color3.fromRGB(255,140,0)); stopLoop()
+	end
+end)
+
+viewBtn.MouseButton1Click:Connect(function()
+	viewActive = not viewActive
+	if viewActive then
+		if textbox.Text == "" then setStatus("Escribe un nombre primero", Color3.fromRGB(255,200,0)); viewActive = false; return end
+		viewBtn.Text = "👁 VIEW: ON"; viewBtn.TextColor3 = Color3.fromRGB(120,210,255)
+		TweenService:Create(viewStroke,TweenInfo.new(0.2),{Color=Color3.fromRGB(60,160,255)}):Play()
+		local trgt = findPlayer(textbox.Text)
+		setStatus("Viendo: "..(trgt and trgt.Name or textbox.Text), Color3.fromRGB(100,200,255))
+		startView()
+	else
+		viewBtn.Text = "👁 VIEW: OFF"; viewBtn.TextColor3 = Color3.fromRGB(255,255,255)
+		TweenService:Create(viewStroke,TweenInfo.new(0.2),{Color=Color3.fromRGB(30,80,160)}):Play()
+		setStatus("Vista restaurada", Color3.fromRGB(255,180,180)); stopView()
+	end
+end)
+
+panel.Size = UDim2.new(0,W,0,0)
+TweenService:Create(panel, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0,W,0,H)}):Play()
+
+-- ── ACOPLAMIENTO DE PLUGIN PARA EL ADMIN (CONSOLA/CHAT) ──
+cmdPluginAdd = {
+    Aliases = {"nanfling", "nfling", "nanf"},
+    ArgsHint = "[player]",
+    Info = "Abre la interfaz visual de NaN Fling y permite atacar via comando de consola.",
+    Function = function(args)
+        -- Si usaron el comando de chat con un argumento (ej: ;nanfling rob), ejecuta el ataque rápido sin abrir el panel
+        if args[1] then
+            local targetName = args[1]:lower()
+            local foundTarget = nil
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= Players.LocalPlayer and (p.Name:lower():find(targetName, 1, true) or p.DisplayName:lower():find(targetName, 1, true)) then
+                    foundTarget = p
+                    break
+                end
+            end
+            if foundTarget then
+                runFlingAttack(foundTarget, 1.5)
+            end
+        else
+            -- Si solo escribieron el comando plano (;nanfling), reabre/muestra la interfaz visual si estaba minimizada
+            panel.Visible = true
+            panel.Size = UDim2.new(0, W, 0, H)
+            toggleBtn.Text = "🥊"
+            panelVisible = true
+        end
+    end,
+    RequiresArguments = false
+}
