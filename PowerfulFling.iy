@@ -51,7 +51,7 @@ local Plugin = {
 }
 
 function executeFling(targetName, speaker, isLoop)
-    local fling_vector = Vector3.new(0, 1e99, 0)
+    local fling_vector = Vector3.new(0, -9e38, 0)
 
     for _, v in next, getPlayer(targetName, speaker) do
         local trgt = Players:FindFirstChild(v)
